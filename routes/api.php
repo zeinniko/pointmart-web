@@ -3,17 +3,8 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::options('/{any}', function () {
-    return response()->json([], 200, [
-        'Access-Control-Allow-Origin' => '*',
-        'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers' => '*',
-    ]);
-})->where('any', '.*');
-
-
-
 // ✅ Gunakan semua controller
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserAddressController;
@@ -56,45 +47,64 @@ use App\Http\Controllers\Api\StockMovementController;
 |--------------------------------------------------------------------------
 */
 
-// A. USERS & ROLES
-Route::apiResource('roles', RoleController::class);
-Route::apiResource('users', UserController::class);
-Route::apiResource('user-addresses', UserAddressController::class);
-Route::apiResource('user-devices', UserDeviceController::class);
+/*
+|--------------------------------------------------------------------------
+| AUTH (system security)
+|--------------------------------------------------------------------------
+*/
+Route::post('sign_in_identifier', [AuthController::class, 'login']);
+Route::post('sign_up_verifier', [AuthController::class, 'register']);
+Route::post('send_reset_code', [AuthController::class, 'sendResetCode']);
+Route::post('verify_reset_code', [AuthController::class, 'verifyResetCode']);
+Route::post('change_password/reset', [AuthController::class, 'changePassword']);
 
-// B. LAUNDRY SYSTEM
-Route::apiResource('laundry-packages', LaundryPackageController::class);
-Route::apiResource('laundry-items', LaundryItemController::class);
-Route::apiResource('laundry-addons', LaundryAddonController::class);
-Route::apiResource('laundry-orders', LaundryOrderController::class);
-Route::apiResource('laundry-order-items', LaundryOrderItemController::class);
-Route::apiResource('laundry-order-addons', LaundryOrderAddonController::class);
-Route::apiResource('laundry-status-history', LaundryStatusHistoryController::class);
+/*
+|--------------------------------------------------------------------------
+| PROTECTED API (Semua butuh token)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth:sanctum')->group(function () {
 
-// C. MINIMARKET SYSTEM
-Route::apiResource('product-categories', ProductCategoryController::class);
-Route::apiResource('products', ProductController::class);
-Route::apiResource('product-stock', ProductStockController::class);
-Route::apiResource('carts', CartController::class);
-Route::apiResource('cart-items', CartItemController::class);
-Route::apiResource('market-orders', MarketOrderController::class);
-Route::apiResource('market-order-items', MarketOrderItemController::class);
-Route::apiResource('suppliers', SupplierController::class);
-Route::apiResource('purchases', PurchaseController::class);
-Route::apiResource('purchase-items', PurchaseItemController::class);
+    // A. USERS & ROLES
+    Route::apiResource('roles', RoleController::class);
+    Route::apiResource('users', UserController::class);
+    Route::apiResource('user-addresses', UserAddressController::class);
+    Route::apiResource('user-devices', UserDeviceController::class);
 
-// D. DELIVERY SYSTEM
-Route::apiResource('delivery-requests', DeliveryRequestController::class);
-Route::apiResource('delivery-status-history', DeliveryStatusHistoryController::class);
+    // B. LAUNDRY SYSTEM
+    Route::apiResource('laundry-packages', LaundryPackageController::class);
+    Route::apiResource('laundry-items', LaundryItemController::class);
+    Route::apiResource('laundry-addons', LaundryAddonController::class);
+    Route::apiResource('laundry-orders', LaundryOrderController::class);
+    Route::apiResource('laundry-order-items', LaundryOrderItemController::class);
+    Route::apiResource('laundry-order-addons', LaundryOrderAddonController::class);
+    Route::apiResource('laundry-status-history', LaundryStatusHistoryController::class);
 
-// E. POS SYSTEM
-Route::apiResource('pos-orders', PosOrderController::class);
-Route::apiResource('pos-order-items', PosOrderItemController::class);
+    // C. MINIMARKET SYSTEM
+    Route::apiResource('product-categories', ProductCategoryController::class);
+    Route::apiResource('products', ProductController::class);
+    Route::apiResource('product-stock', ProductStockController::class);
+    Route::apiResource('carts', CartController::class);
+    Route::apiResource('cart-items', CartItemController::class);
+    Route::apiResource('market-orders', MarketOrderController::class);
+    Route::apiResource('market-order-items', MarketOrderItemController::class);
+    Route::apiResource('suppliers', SupplierController::class);
+    Route::apiResource('purchases', PurchaseController::class);
+    Route::apiResource('purchase-items', PurchaseItemController::class);
 
-// F. PAYMENT & INVOICE
-Route::apiResource('payments', PaymentController::class);
-Route::apiResource('invoices', InvoiceController::class);
+    // D. DELIVERY SYSTEM
+    Route::apiResource('delivery-requests', DeliveryRequestController::class);
+    Route::apiResource('delivery-status-history', DeliveryStatusHistoryController::class);
 
-// G. REPORTING
-Route::apiResource('daily-reports', DailyReportController::class);
-Route::apiResource('stock-movements', StockMovementController::class);
+    // E. POS SYSTEM
+    Route::apiResource('pos-orders', PosOrderController::class);
+    Route::apiResource('pos-order-items', PosOrderItemController::class);
+
+    // F. PAYMENT & INVOICE
+    Route::apiResource('payments', PaymentController::class);
+    Route::apiResource('invoices', InvoiceController::class);
+
+    // G. REPORTING
+    Route::apiResource('daily-reports', DailyReportController::class);
+    Route::apiResource('stock-movements', StockMovementController::class);
+});
