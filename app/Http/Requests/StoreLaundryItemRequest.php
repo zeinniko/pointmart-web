@@ -14,12 +14,12 @@ class StoreLaundryItemRequest extends FormRequest
     public function rules()
     {
         return [
-            'package_id' => 'required|integer|exists:laundry_packages,id',
-            'item_name' => 'required|string|max:255',
-            'price' => 'nullable|numeric|min:0',
-            'category' => 'nullable|string|max:100',
-            'image' => 'nullable|string|max:255',
-            'is_active' => 'nullable|boolean',
+            'package_id'    => 'required|integer|exists:laundry_packages,id',
+            'item_name'     => 'required|string|max:255',
+            'price'         => 'nullable|numeric|min:0',
+            'category'      => 'nullable|string|max:100',
+            'image'         => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'is_active'     => 'nullable|boolean',
         ];
     }
 }

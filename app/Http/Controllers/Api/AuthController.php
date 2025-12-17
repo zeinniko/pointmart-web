@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -29,9 +30,19 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
+        Log::info('Login attempt', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
         $user = User::where('email', $request->email)->first();
 
         if (!$user || ! Hash::check($request->password, $user->password)) {
+            Log::warning('Login failed: email not found', [
+                'email' => $request->email,
+                'ip' => $request->ip(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Email atau password salah',
@@ -40,6 +51,13 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('API Token')->plainTextToken;
+
+
+        Log::info('Login success', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -198,7 +216,7 @@ class AuthController extends Controller
                 ], 400);
             }
 
-            $user = \App\Models\User::where('email', $request->email)->first();
+            $user = User::where('email', $request->email)->first();
 
             // hapus kode reset setelah berhasil digunakan
             DB::table('password_resets')->where('email', $request->email)->delete();
