@@ -10,7 +10,6 @@ class PosOrderItem extends Model
     use HasFactory;
 
     protected $table = 'pos_order_items';
-
     protected $fillable = [
         'pos_order_id',
         'product_id',
