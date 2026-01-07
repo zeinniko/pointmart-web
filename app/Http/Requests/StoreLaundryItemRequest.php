@@ -18,7 +18,7 @@ class StoreLaundryItemRequest extends FormRequest
             'item_name'     => 'required|string|max:255',
             'price'         => 'nullable|numeric|min:0',
             'category'      => 'nullable|string|max:100',
-            'image'         => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'image' => 'nullable|string|max:255',
             'is_active'     => 'nullable|boolean',
         ];
     }

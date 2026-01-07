@@ -87,6 +87,11 @@ class ProductCategoryController extends Controller
     public function destroy(ProductCategory $productCategory): JsonResponse
     {
         $productCategory->delete();
-        return response()->json(null, 204);
+    
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
+    
 }

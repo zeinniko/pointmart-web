@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Models\StockMovement;
+
 
 class PosOrderController extends Controller
 {
@@ -21,8 +23,7 @@ class PosOrderController extends Controller
     {
         return response()->json(
             PosOrder::with('items.product')
-                ->latest()
-                ->paginate(10)
+                ->get()
         );
     }
 
@@ -37,19 +38,19 @@ class PosOrderController extends Controller
             'items.*.qty'        => 'required|integer|min:1',
             'payment_method'     => 'nullable|string',
         ]);
-    
+
         return DB::transaction(function () use ($request) {
             try {
                 $total = 0;
                 $orderItemsData = [];
-    
+
                 Log::info('POS Order: Validating stock', ['items' => $request->items]);
-    
+
                 // === VALIDASI STOCK DULU ===
                 foreach ($request->items as $item) {
                     $product = Product::findOrFail($item['product_id']);
                     $stock = ProductStock::where('product_id', $product->id)->lockForUpdate()->first();
-    
+
                     if (!$stock || $stock->stock < $item['qty']) {
                         Log::warning('POS Order: Stock tidak cukup', [
                             'product_id' => $product->id,
@@ -58,10 +59,10 @@ class PosOrderController extends Controller
                         ]);
                         abort(422, "Stock tidak cukup untuk {$product->name}");
                     }
-    
+
                     $subtotal = $product->price * $item['qty'];
                     $total += $subtotal;
-    
+
                     $orderItemsData[] = [
                         'product_id' => $product->id,
                         'qty'        => $item['qty'],
@@ -69,9 +70,9 @@ class PosOrderController extends Controller
                         'subtotal'   => $subtotal,
                     ];
                 }
-    
+
                 Log::info('POS Order: Stock valid, creating order', ['total' => $total]);
-    
+
                 // === CREATE ORDER ===
                 $order = PosOrder::create([
                     'order_code'     => 'POS-' . strtoupper(Str::random(8)),
@@ -79,33 +80,36 @@ class PosOrderController extends Controller
                     'total_price'    => $total,
                     'payment_method' => $request->payment_method ?? 'cash',
                 ]);
-    
+
                 Log::info('POS Order: Order created', ['order_id' => $order->id]);
-    
+
                 // === INSERT ITEMS & REDUCE STOCK ===
                 foreach ($orderItemsData as $itemData) {
                     PosOrderItem::create([
                         'pos_order_id' => $order->id,
                         ...$itemData,
                     ]);
-    
-                    // reduce stock
-                    $stock = ProductStock::where('product_id', $itemData['product_id'])->lockForUpdate()->first();
-                    $stock->decrement('stock', $itemData['qty']);
 
-                    Log::info('POS Order: Stock updated', [
+                    // 🔥 STOCK MOVEMENT (OUT)
+                    StockMovement::create([
                         'product_id' => $itemData['product_id'],
-                        'qty_reduced' => $itemData['qty'],
-                        'new_stock'   => $stock->fresh()->stock
+                        'type'       => 'out',
+                        'qty'        => $itemData['qty'],
+                        'notes'      => "POS Order {$order->order_code}",
+                        'created_by' => auth()->id() ?? 1,
+                        'created_at' => now()
                     ]);
-                    
+
+                    // 🔄 RECALCULATE STOCK
+                    $this->recalculateStock($itemData['product_id']);
                 }
-    
+
+
                 Log::info('POS Order: All items inserted and stock updated', ['order_id' => $order->id]);
-    
+
                 // 🔥 LOAD SETELAH COMMIT
                 $order->load('items.product');
-        
+
                 return response()->json([
                     'message' => 'Order berhasil dibuat',
                     'data'    => $order
@@ -158,9 +162,19 @@ class PosOrderController extends Controller
             $order = PosOrder::with('items')->findOrFail($id);
 
             foreach ($order->items as $item) {
-                ProductStock::where('product_id', $item->product_id)
-                    ->increment('stock', $item->qty);
+
+                StockMovement::create([
+                    'product_id' => $item->product_id,
+                    'type'       => 'in',
+                    'qty'        => $item->qty,
+                    'notes'      => "Cancel POS Order {$order->order_code}",
+                    'created_by' => auth()->id() ?? 1,
+                    'created_at' => now(),
+                ]);
+
+                $this->recalculateStock($item->product_id);
             }
+
 
             $order->items()->delete();
             $order->delete();

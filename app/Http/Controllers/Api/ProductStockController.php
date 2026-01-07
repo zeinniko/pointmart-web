@@ -10,9 +10,32 @@ use App\Models\ProductStock;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Models\StockMovement;
 
 class ProductStockController extends Controller
 {
+
+    private function recalculateStock(int $productId): ProductStock
+    {
+        $stockIn = StockMovement::where('product_id', $productId)
+            ->where('type', 'in')
+            ->sum('qty');
+
+        $stockOut = StockMovement::where('product_id', $productId)
+            ->where('type', 'out')
+            ->sum('qty');
+
+        $finalStock = $stockIn - $stockOut;
+
+        return ProductStock::updateOrCreate(
+            ['product_id' => $productId],
+            [
+                'stock'      => $finalStock,
+                'updated_by' => auth()->id() ?? 1,
+            ]
+        );
+    }
+
     /**
      * Display a listing of product stock with optional eager loading.
      *
@@ -30,9 +53,7 @@ class ProductStockController extends Controller
             $query->where('product_id', $request->product_id);
         }
 
-        if ($request->boolean('include_product')) {
-            $query->with('product');
-        }
+        $query->with('product');
 
         if ($request->boolean('include_updated_by')) {
             $query->with('updatedBy');
@@ -52,15 +73,24 @@ class ProductStockController extends Controller
         $validated = $request->validated();
 
         $stock = DB::transaction(function () use ($validated) {
-            return ProductStock::updateOrCreate(
-                ['product_id' => $validated['product_id']],
-                $validated
-            );
+
+            // 1️⃣ CREATE STOCK MOVEMENT
+            StockMovement::create([
+                'product_id' => $validated['product_id'],
+                'type'       => $validated['type'], // in | out
+                'qty'        => $validated['qty'],
+                'notes'      => $validated['notes'] ?? null,
+                'created_by' => auth()->id() ?? 1,
+                'created_at' => now(),
+            ]);
+
+            // 2️⃣ RECALCULATE STOCK
+            return $this->recalculateStock($validated['product_id']);
         });
 
-        return (new ProductStockResource($stock->load('product', 'updatedBy')))
-            ->response()
-            ->setStatusCode(201);
+        return (new ProductStockResource(
+            $stock->load('product', 'updatedBy')
+        ))->response()->setStatusCode(201);
     }
 
     /**
@@ -84,12 +114,15 @@ class ProductStockController extends Controller
      */
     public function update(UpdateProductStockRequest $request, ProductStock $productStock): JsonResponse
     {
-        DB::transaction(fn () => $productStock->update($request->validated()));
+        $productStock->update(
+            $request->only(['min_stock', 'updated_by'])
+        );
 
-        return (new ProductStockResource($productStock->fresh()->load('product', 'updatedBy')))
-            ->response()
-            ->setStatusCode(200);
+        return (new ProductStockResource(
+            $productStock->fresh()->load('product', 'updatedBy')
+        ))->response()->setStatusCode(200);
     }
+
 
     /**
      * Delete stock entry — jarang dipakai karena stock penting, tapi tetap disiapkan
@@ -97,6 +130,9 @@ class ProductStockController extends Controller
     public function destroy(ProductStock $productStock): JsonResponse
     {
         $productStock->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
 }

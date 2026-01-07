@@ -99,6 +99,9 @@ class LaundryPackageController extends Controller
         // Jika butuh cek relasi sebelum delete, tambahkan logika di sini.
         $laundryPackage->delete();
 
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
 }

@@ -41,6 +41,9 @@ use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\DailyReportController;
 use App\Http\Controllers\Api\StockMovementController;
 
+use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\AppSettingController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -52,11 +55,16 @@ use App\Http\Controllers\Api\StockMovementController;
 | AUTH (system security)
 |--------------------------------------------------------------------------
 */
+
 Route::post('sign_in_identifier', [AuthController::class, 'login']);
 Route::post('sign_up_verifier', [AuthController::class, 'register']);
 Route::post('send_reset_code', [AuthController::class, 'sendResetCode']);
 Route::post('verify_reset_code', [AuthController::class, 'verifyResetCode']);
 Route::post('change_password/reset', [AuthController::class, 'changePassword']);
+
+Route::get('/app-settings', function () {
+    return App\Models\AppSetting::pluck('value', 'key');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -107,4 +115,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // G. REPORTING
     Route::apiResource('daily-reports', DailyReportController::class);
     Route::apiResource('stock-movements', StockMovementController::class);
+    Route::get('daily-reports/chart', [DailyReportController::class, 'chart']);
+
+    Route::apiResource('feedbacks', FeedbackController::class);
+    Route::post('feedbacks/{id}/response', [FeedbackController::class, 'respond']);
+    Route::get('settings', [AppSettingController::class, 'index']);
+    Route::get('settings/{key}', [AppSettingController::class, 'show']);
+    Route::post('settings', [AppSettingController::class, 'store']);
 });

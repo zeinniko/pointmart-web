@@ -3,47 +3,46 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\UserDevice;
 use Illuminate\Http\Request;
 
 class UserDeviceController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * GET /user-devices
+     * List device user login
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        return response()->json([
+            'success' => true,
+            'message' => 'Daftar device user',
+            'data' => UserDevice::where('user_id', $request->user()->id)->get()
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * DELETE /user-devices/{id}
+     * Logout device tertentu
      */
-    public function store(Request $request)
+    public function destroy(Request $request, string $id)
     {
-        //
-    }
+        $device = UserDevice::where('id', $id)
+            ->where('user_id', $request->user()->id)
+            ->first();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
+        if (!$device) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device tidak ditemukan'
+            ], 404);
+        }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+        $device->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'success' => true,
+            'message' => 'Device berhasil dihapus'
+        ]);
     }
 }

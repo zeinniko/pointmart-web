@@ -44,9 +44,8 @@ class ProductController extends Controller
             $query->where('is_active', (bool) $request->is_active);
         }
 
-        if ($request->boolean('include_category')) {
-            $query->with('category');
-        }
+        $query->with('category');
+        
 
         if ($request->boolean('include_stock')) {
             $query->with('stock');
@@ -105,6 +104,9 @@ class ProductController extends Controller
     public function destroy(Product $product): JsonResponse
     {
         $product->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
 }

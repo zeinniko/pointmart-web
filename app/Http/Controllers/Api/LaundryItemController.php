@@ -43,9 +43,8 @@ class LaundryItemController extends Controller
             $query->where('is_active', (bool) $request->is_active);
         }
 
-        if ($request->boolean('include_package')) {
-            $query->with('package');
-        }
+        $query->with('package');
+
 
         $perPage = (int) $request->get('per_page', 15);
         $data = $query->orderBy('item_name')->paginate($perPage);
@@ -101,6 +100,9 @@ class LaundryItemController extends Controller
     public function destroy(LaundryItem $laundryItem): JsonResponse
     {
         $laundryItem->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
 }

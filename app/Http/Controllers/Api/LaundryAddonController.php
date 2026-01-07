@@ -86,6 +86,9 @@ class LaundryAddonController extends Controller
     public function destroy(LaundryAddon $laundryAddon): JsonResponse
     {
         $laundryAddon->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully'
+        ]);
     }
 }
