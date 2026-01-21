@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
 
 class CartController extends Controller
 {
@@ -31,16 +33,30 @@ class CartController extends Controller
      */  
     public function store(Request $request)
     {
-        $cart = Cart::firstOrCreate([
-            'user_id' => $request->user()->id
+        Log::info('[CART][STORE] Request masuk', [
+            'user_id' => optional($request->user())->id,
         ]);
-
+    
+        $cart = Cart::firstOrCreate(
+            ['user_id' => $request->user()->id],
+            ['created_at' => now()]
+        );
+    
+        Log::info('[CART][STORE] Cart diproses', [
+            'user_id' => $request->user()->id,
+            'cart_id' => $cart->id,
+            'status'  => $cart->wasRecentlyCreated ? 'CREATED' : 'EXISTING',
+        ]);
+    
         return response()->json([
             'success' => true,
-            'message' => 'Cart berhasil dibuat',
+            'message' => $cart->wasRecentlyCreated
+                ? 'Cart berhasil dibuat'
+                : 'Cart sudah tersedia',
             'data' => $cart
         ], 201);
     }
+    
 
     /**
      * GET /carts/{id}
@@ -72,11 +88,18 @@ class CartController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        Log::warning('[CART][UPDATE] Update ditolak', [
+            'cart_id' => $id,
+            'user_id' => optional($request->user())->id,
+            'payload' => $request->all(),
+        ]);
+    
         return response()->json([
             'success' => false,
             'message' => 'Cart tidak bisa diubah secara langsung'
         ], 400);
     }
+    
 
     /**
      * DELETE /carts/{id}
