@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 
+
 class UserController extends Controller
 {
     /**
@@ -62,28 +63,28 @@ class UserController extends Controller
     {
         if ($id === 'me') {
             $user = Auth::user();
-    
+
             if (!$user) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized'
                 ], 401);
             }
-    
+
             return response()->json([
                 'success' => true,
                 'data' => $user
             ]);
         }
-    
+
         $user = User::with(['role', 'addresses', 'devices'])->findOrFail($id);
-    
+
         return response()->json([
             'success' => true,
             'data' => $user
         ]);
     }
-    
+
 
     /**
      * Update the specified resource in storage.
@@ -123,6 +124,25 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User deleted'
+        ]);
+    }
+
+    public function me()
+    {
+        $user = User::with(['role', 'addresses', 'devices'])
+            ->findOrFail(auth()->id());
+
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $user
         ]);
     }
 }

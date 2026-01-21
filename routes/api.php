@@ -72,6 +72,7 @@ Route::get('/app-settings', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('get_profile', [UserController::class, 'me']);
 
     // A. USERS & ROLES
     Route::apiResource('roles', RoleController::class);
