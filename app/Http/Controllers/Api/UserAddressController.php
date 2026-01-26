@@ -162,11 +162,11 @@ class UserAddressController extends Controller
             ], 422);
         }
     
-        if ($request->is_default) {
+        if ($request->has('is_default') && $request->boolean('is_default')) {
             Log::info('[ADDRESS][UPDATE] Set default → reset alamat lain', [
                 'user_id' => $request->user()->id,
             ]);
-    
+        
             UserAddress::where('user_id', $request->user()->id)
                 ->update(['is_default' => false]);
         }

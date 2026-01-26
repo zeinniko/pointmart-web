@@ -73,6 +73,7 @@ Route::get('/app-settings', function () {
 */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('get_profile', [UserController::class, 'me']);
+    Route::post('/uploads/image', [AppSettingController::class, 'image']);
 
     // A. USERS & ROLES
     Route::apiResource('roles', RoleController::class);
