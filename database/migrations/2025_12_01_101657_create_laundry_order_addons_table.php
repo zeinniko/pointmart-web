@@ -18,6 +18,7 @@ return new class extends Migration
             $table->decimal('price', 10, 2)->nullable();
             $table->integer('quantity')->nullable();
             $table->decimal('subtotal', 10, 2)->nullable();
+            $table->timestamps();
         });
         
     }
