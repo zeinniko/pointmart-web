@@ -124,4 +124,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('settings', [AppSettingController::class, 'index']);
     Route::get('settings/{key}', [AppSettingController::class, 'show']);
     Route::post('settings', [AppSettingController::class, 'store']);
+
+    Route::post('/cart-laundry/add', [LaundryOrderController::class, 'addToCart']);
+    Route::get('/cart-laundry', [LaundryOrderController::class, 'getCart']);
+    Route::delete('/cart-laundry/{id}', [LaundryOrderController::class, 'removeCart']);
+
 });
