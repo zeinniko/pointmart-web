@@ -25,23 +25,25 @@ class ProductCategoryController extends Controller
     public function index(Request $request)
     {
         $query = ProductCategory::query();
-
+    
         if ($request->filled('q')) {
             $keyword = $request->q;
             $query->where('name', 'like', "%$keyword%");
         }
-
+    
         if ($request->filled('is_active')) {
             $query->where('is_active', (bool) $request->is_active);
         }
-
+    
+        $query->has('products');
+    
         if ($request->boolean('include_products')) {
             $query->with('products');
         }
-
+    
         $perPage = (int) $request->get('per_page', 15);
         $data = $query->orderBy('name')->paginate($perPage);
-
+    
         return ProductCategoryResource::collection($data);
     }
 
