@@ -129,5 +129,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cart-laundry/add', [LaundryOrderController::class, 'addToCart']);
     Route::get('/cart-laundry', [LaundryOrderController::class, 'getCart']);
     Route::delete('/cart-laundry/{id}', [LaundryOrderController::class, 'removeCart']);
+    Route::post('/laundry/checkout', [LaundryOrderController::class, 'checkout']);
 
 });

@@ -7,8 +7,13 @@ use App\Models\LaundryOrder;
 use App\Models\LaundryPackage;
 use App\Models\LaundryItem;
 use App\Models\LaundryOrderItem;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+
 
 class LaundryOrderController extends Controller
 {
@@ -233,35 +238,108 @@ class LaundryOrderController extends Controller
 
     public function checkout(Request $request)
     {
-        $request->validate([
-            'address_id' => 'required|exists:user_addresses,id',
-            'pickup_time' => 'required|date',
-            'delivery_time' => 'nullable|date',
-            'notes' => 'nullable|string',
-        ]);
-
-        $orders = LaundryOrder::where('user_id', $request->user()->id)
+        $user = $request->user();
+    
+        // ambil default address
+        $defaultAddress = $user->addresses()
+            ->where('is_default', true)
+            ->first();
+    
+        if (!$defaultAddress) {
+            return response()->json([
+                'message' => 'Alamat default belum dipilih'
+            ], 400);
+        }
+    
+        // =========================
+        // MARKET CHECKOUT
+        // =========================
+        if ($request->is_included_market_item) {
+    
+            $items = $request->items;
+    
+            if (empty($items)) {
+                return response()->json([
+                    'message' => 'Item kosong'
+                ], 400);
+            }
+    
+            DB::beginTransaction();
+    
+            try {
+                $order = Order::create([
+                    'order_code' => 'ORD-' . time(),
+                    'payment_status' => 'pending',
+                    'user_id'    => $user->id,
+                    'address_id' => $defaultAddress->id,
+                    'order_status'     => 'created',
+                    'total_price'=> 0,
+                ]);
+    
+                $total = 0;
+    
+                foreach ($items as $item) {
+                    $product = Product::find($item['product_id']);
+    
+                    if (!$product) {
+                        throw new \Exception('Product tidak ditemukan');
+                    }
+    
+                    $subtotal = $product->price * $item['qty'];
+    
+                    OrderItem::create([
+                        'order_id'   => $order->id,
+                        'product_id' => $product->id,
+                        'price'      => $product->price,
+                        'qty'        => $item['qty'],
+                        'subtotal'   => $subtotal,
+                    ]);
+    
+                    $total += $subtotal;
+                }
+    
+                $order->update([
+                    'total_price' => $total
+                ]);
+    
+                DB::commit();
+    
+                return response()->json([
+                    'message' => 'Order market berhasil dibuat',
+                    'order_id' => $order->id
+                ]);
+    
+            } catch (\Exception $e) {
+                DB::rollBack();
+    
+                return response()->json([
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+        }
+    
+        // =========================
+        // LAUNDRY CHECKOUT (DEFAULT)
+        // =========================
+        $orders = LaundryOrder::where('user_id', $user->id)
             ->where('order_status', 'cart')
             ->get();
-
+    
         if ($orders->isEmpty()) {
             return response()->json([
                 'message' => 'Cart kosong'
             ], 400);
         }
-
+    
         foreach ($orders as $order) {
             $order->update([
-                'address_id'   => $request->address_id,
-                'pickup_time'  => $request->pickup_time,
-                'delivery_time' => $request->delivery_time,
-                'notes'        => $request->notes,
-                'order_status' => 'process',
+                'address_id'   => $defaultAddress->id,
+                'order_status' => 'created',
             ]);
         }
-
+    
         return response()->json([
-            'message' => 'Order berhasil dibuat',
+            'message' => 'Order laundry berhasil dibuat',
         ]);
     }
 }
