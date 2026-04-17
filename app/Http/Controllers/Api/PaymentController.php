@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\LaundryOrder;
 use App\Models\PosOrder;
+use App\Models\Order;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -12,11 +14,31 @@ class PaymentController extends Controller
     /**
      * List payments
      */
-    public function index()
+
+    public function index(Request $request)
     {
-        return response()->json(
-            Payment::latest()->paginate(10)
-        );
+        $orders = LaundryOrder::with([
+            'user',
+            'package',
+            'address',
+            'driver',
+            'items',
+            'addons',
+            'payment',
+            'invoice'
+        ])
+            ->where('order_status', '!=', 'cart')
+            ->when($request->status, function ($query) use ($request) {
+                $query->where('order_status', $request->status);
+            })
+            ->latest()
+            ->paginate(10);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'List Order',
+            'data' => $orders
+        ]);
     }
 
     /**
@@ -50,11 +72,31 @@ class PaymentController extends Controller
     /**
      * Show payment detail
      */
-    public function show(string $id)
+    public function show($id)
     {
-        return response()->json(
-            Payment::findOrFail($id)
-        );
+        $order = LaundryOrder::with([
+            'user',
+            'package',
+            'address',
+            'items.item',
+            'addons.addon',
+            'payment',
+            'invoice'
+        ])->findOrFail($id);
+
+        // ambil order marketplace berdasarkan user
+        $marketplaceOrders = Order::with([
+            'items.product',
+            'address'
+        ])
+            ->where('user_id', $order->user_id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'data' => $order,
+            'marketplace_orders' => $marketplaceOrders
+        ]);
     }
 
     /**
@@ -62,10 +104,10 @@ class PaymentController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $payment = Payment::findOrFail($id);
+        $payment = LaundryOrder::findOrFail($id);
 
         $payment->update(
-            $request->only(['status', 'method'])
+            $request->only(['order_status'])
         );
 
         return response()->json([

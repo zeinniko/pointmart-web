@@ -113,30 +113,30 @@ class LaundryOrderController extends Controller
             'order_items.*.laundry_item_id' => 'required_with:order_items|exists:laundry_items,id',
             'order_items.*.qty' => 'required_with:order_items|integer|min:1',
         ]);
-    
+
         $user = $request->user();
-    
+
         $total = 0;
-    
+
         // =========================================
         // CASE 1: LAUNDRY SATUAN (ADA order_items)
         // =========================================
         if ($request->has('order_items') && count($request->order_items) > 0) {
-    
+
             $order = LaundryOrder::create([
                 'order_code'    => 'LD-' . strtoupper(Str::random(8)),
                 'user_id'       => $user->id,
                 'package_id'    => null,
                 'weight_input'  => null,
                 'total_price'   => 0,
-                'payment_status'=> 'pending',
+                'payment_status' => 'pending',
                 'order_status'  => 'cart',
             ]);
-    
+
             foreach ($request->order_items as $itemData) {
                 $laundryItem = LaundryItem::findOrFail($itemData['laundry_item_id']);
                 $subtotal = $laundryItem->price * $itemData['qty'];
-    
+
                 LaundryOrderItem::create([
                     'laundry_order_id' => $order->id,
                     'laundry_item_id'  => $laundryItem->id,
@@ -144,18 +144,18 @@ class LaundryOrderController extends Controller
                     'price'            => $laundryItem->price,
                     'subtotal'         => $subtotal,
                 ]);
-    
+
                 $total += $subtotal;
             }
-    
+
             $order->update(['total_price' => $total]);
-    
+
             return response()->json([
                 'message' => 'Added to cart (Satuan)',
                 'data' => $order->load(['items.item'])
             ], 201);
         }
-    
+
         // =========================================
         // CASE 2: LAUNDRY KILOAN (PACKAGE)
         // =========================================
@@ -164,27 +164,27 @@ class LaundryOrderController extends Controller
                 'message' => 'package_id wajib jika tanpa order_items'
             ], 400);
         }
-    
+
         $package = LaundryPackage::findOrFail($request->package_id);
-    
+
         if ($package->min_kg && $request->weight_input < $package->min_kg) {
             return response()->json([
                 'message' => 'Minimal ' . $package->min_kg . ' Kg'
             ], 400);
         }
-    
+
         $total = $package->price_per_kg * $request->weight_input;
-    
+
         $order = LaundryOrder::create([
             'order_code'    => 'LD-' . strtoupper(Str::random(8)),
             'user_id'       => $user->id,
             'package_id'    => $package->id,
             'weight_input'  => $request->weight_input,
             'total_price'   => $total,
-            'payment_status'=> 'pending',
+            'payment_status' => 'pending',
             'order_status'  => 'cart',
         ]);
-    
+
         return response()->json([
             'message' => 'Added to cart (Kiloan)',
             'data' => $order->load(['package'])
@@ -198,9 +198,9 @@ class LaundryOrderController extends Controller
             ->where('order_status', 'cart')
             ->latest()
             ->get();
-    
-       $grandTotal = $orders->sum('total_price');
-    
+
+        $grandTotal = $orders->sum('total_price');
+
         return response()->json([
             'message' => 'Cart fetched',
             'total_item' => $orders->count(),
@@ -228,6 +228,40 @@ class LaundryOrderController extends Controller
 
         return response()->json([
             'message' => 'Item removed from cart'
+        ]);
+    }
+
+    public function checkout(Request $request)
+    {
+        $request->validate([
+            'address_id' => 'required|exists:user_addresses,id',
+            'pickup_time' => 'required|date',
+            'delivery_time' => 'nullable|date',
+            'notes' => 'nullable|string',
+        ]);
+
+        $orders = LaundryOrder::where('user_id', $request->user()->id)
+            ->where('order_status', 'cart')
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'message' => 'Cart kosong'
+            ], 400);
+        }
+
+        foreach ($orders as $order) {
+            $order->update([
+                'address_id'   => $request->address_id,
+                'pickup_time'  => $request->pickup_time,
+                'delivery_time' => $request->delivery_time,
+                'notes'        => $request->notes,
+                'order_status' => 'process',
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Order berhasil dibuat',
         ]);
     }
 }

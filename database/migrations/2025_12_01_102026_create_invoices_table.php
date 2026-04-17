@@ -19,6 +19,7 @@ return new class extends Migration
             $table->decimal('amount', 10, 2)->default(0);
             $table->string('pdf_url', 255)->nullable();
             $table->dateTime('issued_at')->nullable();
+            $table->timestamps();
         });
         
     }

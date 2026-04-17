@@ -3,7 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// ✅ Gunakan semua controller
+// Gunakan semua controller
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
@@ -98,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('cart-items', CartItemController::class);
     Route::apiResource('market-orders', MarketOrderController::class);
     Route::apiResource('market-order-items', MarketOrderItemController::class);
+
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('purchases', PurchaseController::class);
     Route::apiResource('purchase-items', PurchaseItemController::class);

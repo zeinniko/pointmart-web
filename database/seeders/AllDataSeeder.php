@@ -15,6 +15,9 @@ use App\Models\ProductCategory;
 use App\Models\LaundryItem;
 use App\Models\UserAddress;
 use App\Models\LaundryAddon;
+use App\Models\Payment;
+use App\Models\Invoice;
+use Carbon\Carbon;
 
 class AllDataSeeder extends Seeder
 {
@@ -437,6 +440,78 @@ class AllDataSeeder extends Seeder
                 'price'     => $price,
                 'subtotal'  => $subtotal,
             ]);
+        }
+
+        // ==============================
+        // DUMMY ORDERS (REAL FLOW)
+        // ==============================
+
+        $statuses = [
+            'created',
+            'process',
+            'valid',
+            'deliver',
+            'finish'
+        ];
+
+        foreach ($statuses as $i => $status) {
+
+            $order = LaundryOrder::create([
+                'order_code'     => 'LD-ORD00' . ($i + 2),
+                'user_id'        => 3,
+                'package_id'     => rand(1, 3),
+                'address_id'     => 9,
+                'pickup_time'    => Carbon::now()->addHours(2),
+                'delivery_time'  => Carbon::now()->addDays(2),
+                'weight_input'   => rand(3, 6),
+                'total_price'    => rand(100, 300),
+                'payment_status' => $status == 'valid' || $status == 'deliver' || $status == 'finish' ? 'paid' : 'pending',
+                'order_status'   => $status,
+                'driver_id'      => null,
+                'notes'          => 'Dummy order ' . $status,
+            ]);
+
+            // ================= ITEMS =================
+            LaundryOrderItem::create([
+                'laundry_order_id' => $order->id,
+                'laundry_item_id'  => 1,
+                'qty'              => rand(1, 3),
+                'price'            => 15,
+                'subtotal'         => 45,
+            ]);
+
+            // ================= ADDON =================
+            LaundryOrderAddon::create([
+                'laundry_order_id' => $order->id,
+                'addon_id'         => 1,
+                'price'            => 20,
+                'quantity'         => 1,
+                'subtotal'         => 20,
+            ]);
+
+            // ================= PAYMENT =================
+            if (in_array($status, ['valid', 'deliver', 'finish'])) {
+                Payment::create([
+                    'order_id'         => $order->id,
+                    'order_type'       => 'laundry',
+                    'amount'           => $order->total_price,
+                    'method'           => 'cash',
+                    'status'           => 'paid',
+                    'transaction_time' => Carbon::now(),
+                ]);
+            }
+
+            // ================= INVOICE =================
+            if ($status == 'finish') {
+                Invoice::create([
+                    'invoice_no' => 'INV-LD-00' . ($i + 1),
+                    'order_id'   => $order->id,
+                    'order_type' => 'laundry',
+                    'amount'     => $order->total_price,
+                    'pdf_url'    => null,
+                    'issued_at'  => Carbon::now(),
+                ]);
+            }
         }
     }
 }

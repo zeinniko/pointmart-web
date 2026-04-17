@@ -9,6 +9,12 @@ class LaundryOrder extends Model
 {
     use HasFactory;
 
+    const STATUS_CREATED = 'created';
+    const STATUS_PROCESS = 'process';
+    const STATUS_VALID = 'valid';
+    const STATUS_DELIVER = 'deliver';
+    const STATUS_FINISH = 'finish';
+
     protected $table = 'laundry_orders';
 
     protected $fillable = [
@@ -59,5 +65,17 @@ class LaundryOrder extends Model
     public function statusHistory()
     {
         return $this->hasMany(LaundryStatusHistory::class, 'laundry_order_id');
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class, 'order_id')
+            ->where('order_type', 'laundry');
+    }
+
+    public function invoice()
+    {
+        return $this->hasOne(Invoice::class, 'order_id')
+            ->where('order_type', 'laundry');
     }
 }

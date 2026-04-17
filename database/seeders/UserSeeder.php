@@ -23,7 +23,7 @@ class UserSeeder extends Seeder
                 'role_id' => $role->id,
                 'name' => $role->name . ' Test',
                 'email' => strtolower($role->name) . '@example.com',
-                'password' => Hash::make('password123'), // password default
+                'password' => Hash::make('password123'),
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ]);
