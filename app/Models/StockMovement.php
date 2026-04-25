@@ -10,6 +10,7 @@ class StockMovement extends Model
     use HasFactory;
 
     protected $table = 'stock_movements';
+    public $timestamps = false;
 
     protected $fillable = [
         'product_id',
