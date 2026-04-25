@@ -15,7 +15,7 @@ use App\Models\StockMovement;
 class ProductStockController extends Controller
 {
 
-    private function recalculateStock(int $productId): ProductStock
+    private function recalculateStock(int $productId, int $minStock): ProductStock
     {
         $stockIn = StockMovement::where('product_id', $productId)
             ->where('type', 'in')
@@ -31,6 +31,7 @@ class ProductStockController extends Controller
             ['product_id' => $productId],
             [
                 'stock'      => $finalStock,
+                'min_stock'      => $minStock,
                 'updated_by' => auth()->id() ?? 1,
             ]
         );
@@ -83,7 +84,7 @@ class ProductStockController extends Controller
                 'created_at' => now(),
             ]);
 
-            return $this->recalculateStock($validated['product_id']);
+            return $this->recalculateStock($validated['product_id'], $validated['min_stock']);
         });
 
         return (new ProductStockResource(
@@ -113,7 +114,7 @@ class ProductStockController extends Controller
     public function update(UpdateProductStockRequest $request, ProductStock $productStock): JsonResponse
     {
         $productStock->update(
-            $request->only(['min_stock', 'updated_by'])
+            $request->only(['min_stock', 'stock', 'updated_by'])
         );
 
         return (new ProductStockResource(
