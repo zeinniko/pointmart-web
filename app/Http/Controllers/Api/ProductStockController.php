@@ -77,7 +77,7 @@ class ProductStockController extends Controller
             StockMovement::create([
                 'product_id' => $validated['product_id'],
                 'type'       => 'in', // in | out
-                'qty'        => $validated['qty'],
+                'qty'        => $validated['stock'],
                 'notes'      => 'add stock by admin' ?? null,
                 'created_by' => auth()->id() ?? 1,
                 'created_at' => now(),
