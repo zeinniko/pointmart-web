@@ -74,17 +74,15 @@ class ProductStockController extends Controller
 
         $stock = DB::transaction(function () use ($validated) {
 
-            // 1️⃣ CREATE STOCK MOVEMENT
-            StockMovement::create([
-                'product_id' => $validated['product_id'],
-                'type'       => $validated['type'], // in | out
-                'qty'        => $validated['qty'],
-                'notes'      => $validated['notes'] ?? null,
-                'created_by' => auth()->id() ?? 1,
-                'created_at' => now(),
-            ]);
+            // StockMovement::create([
+            //     'product_id' => $validated['product_id'],
+            //     'type'       => $validated['type'], // in | out
+            //     'qty'        => $validated['qty'],
+            //     'notes'      => $validated['notes'] ?? null,
+            //     'created_by' => auth()->id() ?? 1,
+            //     'created_at' => now(),
+            // ]);
 
-            // 2️⃣ RECALCULATE STOCK
             return $this->recalculateStock($validated['product_id']);
         });
 
