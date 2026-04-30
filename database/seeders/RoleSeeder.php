@@ -16,6 +16,7 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             ['name' => 'Admin', 'permissions' => json_encode(['*'])],
+            ['name' => 'Deliver', 'permissions' => json_encode(['*'])],
             ['name' => 'Manager', 'permissions' => json_encode(['read', 'write'])],
             ['name' => 'User', 'permissions' => json_encode(['read'])],
         ];
