@@ -121,6 +121,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('daily-reports/chart', [DailyReportController::class, 'chart']);
 
     Route::apiResource('feedbacks', FeedbackController::class);
+    
+    
     Route::post('feedbacks/{id}/response', [FeedbackController::class, 'respond']);
     Route::get('settings', [AppSettingController::class, 'index']);
     Route::get('settings/{key}', [AppSettingController::class, 'show']);
