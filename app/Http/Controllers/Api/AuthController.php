@@ -14,19 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
-    //
     public function login(Request $request)
     {
         $request->validate([
-            /**
-             * Email
-             * @example zeinniko@edukarya.com
-             */
             'email' => 'required|email',
-            /**
-             * Password
-             * @example password
-             */
             'password' => 'required'
         ]);
 
@@ -36,7 +27,7 @@ class AuthController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('role')->where('email', $request->email)->first();
 
         if (!$user || ! Hash::check($request->password, $user->password)) {
             Log::warning('Login failed: email not found', [
@@ -72,21 +63,17 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        // Validasi input
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
         ]);
-
-        // Buat user baru
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
 
-        // Buat token API
         $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
@@ -99,29 +86,21 @@ class AuthController extends Controller
             ]
         ]);
     }
-
+    
     public function profile(Request $request) {}
 
-
-    // ===========================
-    //  UPDATE PROFILE
-    // ===========================
     public function updateProfile(Request $request) {}
 
-    // ===========================
-    // 1️⃣ KIRIM KODE RESET PASSWORD
-    // ===========================
     public function sendResetCode(Request $request)
     {
         $request->validate(['email' => 'required|email|exists:users,email']);
 
-        $code = rand(100000, 999999); // 6 digit angka
+        $code = rand(100000, 999999);
         DB::table('password_resets')->updateOrInsert(
             ['email' => $request->email],
             ['token' => $code, 'created_at' => Carbon::now()]
         );
 
-        // kirim email
         Mail::raw("Kode verifikasi reset password Anda adalah: $code", function ($message) use ($request) {
             $message->to($request->email)
                 ->subject('Kode Verifikasi Reset Password');
@@ -133,10 +112,6 @@ class AuthController extends Controller
         ]);
     }
 
-
-    // ===========================
-    // 2️⃣ VERIFIKASI KODE RESET
-    // ===========================
     public function verifyResetCode(Request $request)
     {
         $request->validate([
@@ -156,35 +131,29 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // Jika valid
         return response()->json([
             'success' => true,
             'message' => 'Kode verifikasi valid. Silakan atur kata sandi baru.',
         ]);
     }
 
-
-    // ===========================
-    // 3️⃣ GANTI PASSWORD (Bisa untuk 2 mode)
-    // ===========================
     public function changePassword(Request $request)
     {
-        $type = $request->input('type', 'auth'); // default = auth
+        $type = $request->input('type', 'auth');
 
         $rules = [
             'password' => [
                 'required',
                 'string',
                 'min:8',
-                'regex:/[A-Z]/',        // harus ada huruf besar
-                'regex:/[0-9]/',        // harus ada angka
-                'regex:/^[A-Za-z0-9]+$/', // hanya huruf dan angka
-                'confirmed',            // harus ada password_confirmation
+                'regex:/[A-Z]/',
+                'regex:/[0-9]/',
+                'regex:/^[A-Za-z0-9]+$/',
+                'confirmed',
             ],
         ];
 
         if ($type === 'reset') {
-            // reset password via email
             $rules['email'] = 'required|email|exists:users,email';
             $rules['token'] = 'required|string|min:6|max:6';
         }
@@ -200,10 +169,8 @@ class AuthController extends Controller
         }
 
         if ($type === 'auth') {
-            // 🔒 User sedang login
             $user = $request->user();
         } else {
-            // ✉️ Lupa password: verifikasi token dulu
             $reset = DB::table('password_resets')
                 ->where('email', $request->email)
                 ->where('token', $request->token)
@@ -217,12 +184,9 @@ class AuthController extends Controller
             }
 
             $user = User::where('email', $request->email)->first();
-
-            // hapus kode reset setelah berhasil digunakan
             DB::table('password_resets')->where('email', $request->email)->delete();
         }
 
-        // Ubah password
         $user->password = Hash::make($request->password);
         $user->save();
 
