@@ -11,6 +11,8 @@ use App\Models\Order;
 use App\Models\UserAddress;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Cart;
+use App\Models\CartItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -273,6 +275,7 @@ class LaundryOrderController extends Controller
                     'order_status' => LaundryOrder::STATUS_CREATED,
                     'total_price' => 0,
                 ]);
+
                 $total = 0;
 
                 foreach ($items as $item) {
@@ -292,18 +295,19 @@ class LaundryOrderController extends Controller
                         'subtotal'   => $subtotal,
                     ]);
 
-                    Log::info('ORDER ITEM CREATED', [
-                        'product_id' => $product->id,
-                        'qty' => $item['qty'],
-                        'subtotal' => $subtotal
-                    ]);
-
                     $total += $subtotal;
                 }
 
                 $order->update([
                     'total_price' => $total
                 ]);
+
+                $cart = Cart::where('user_id', $user->id)->first();
+
+                if ($cart) {
+                    CartItem::where('cart_id', $cart->id)->delete(); // hapus items
+                    $cart->delete();
+                }
 
                 DB::commit();
 
@@ -312,52 +316,47 @@ class LaundryOrderController extends Controller
                     'order_id' => $order->id
                 ]);
             } catch (\Exception $e) {
-
                 DB::rollBack();
-
-                Log::error('MARKET CHECKOUT ERROR', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
 
                 return response()->json([
                     'message' => $e->getMessage()
                 ], 500);
             }
-        }
+        } else {
 
-        // ================= LAUNDRY =================
-        $orders = LaundryOrder::where('user_id', $user->id)
-            ->where('order_status', LaundryOrder::STATUS_CART)
-            ->get();
+            // ================= LAUNDRY =================
+            $orders = LaundryOrder::where('user_id', $user->id)
+                ->where('order_status', LaundryOrder::STATUS_CART)
+                ->get();
 
-        if ($orders->isEmpty()) {
-            return response()->json([
-                'message' => 'Cart kosong'
-            ], 400);
-        }
-
-        DB::beginTransaction();
-
-        try {
-
-            foreach ($orders as $laundry_order) {
-
-                $laundry_order->order_status = LaundryOrder::STATUS_CREATED;
-                $laundry_order->address_id = $defaultAddress->id;
-                $laundry_order->save();
+            if ($orders->isEmpty()) {
+                return response()->json([
+                    'message' => 'Cart kosong'
+                ], 400);
             }
-            DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Order laundry berhasil dibuat',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => $e->getMessage()
-            ], 500);
+            DB::beginTransaction();
+
+            try {
+
+                foreach ($orders as $laundry_order) {
+
+                    $laundry_order->order_status = LaundryOrder::STATUS_CREATED;
+                    $laundry_order->address_id = $defaultAddress->id;
+                    $laundry_order->save();
+                }
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Order laundry berhasil dibuat',
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => $e->getMessage()
+                ], 500);
+            }
         }
     }
 }
