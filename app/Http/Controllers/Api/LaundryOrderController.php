@@ -52,7 +52,7 @@ class LaundryOrderController extends Controller
             'pickup_time'   => $request->pickup_time,
             'delivery_time' => $request->delivery_time,
             'payment_status' => 'pending',
-            'order_status'  => 'created',
+            'order_status'  => LaundryOrder::STATUS_CREATED,
             'total_price'   => 0,
             'notes'         => $request->notes,
         ]);
@@ -99,7 +99,7 @@ class LaundryOrderController extends Controller
     {
         $order = LaundryOrder::findOrFail($id);
 
-        if ($order->order_status !== 'created') {
+        if ($order->order_status !== LaundryOrder::STATUS_CREATED) {
             return response()->json([
                 'message' => 'Order cannot be deleted'
             ], 400);
@@ -136,7 +136,7 @@ class LaundryOrderController extends Controller
                 'weight_input'  => null,
                 'total_price'   => 0,
                 'payment_status' => 'pending',
-                'order_status'  => 'cart',
+                'order_status'  => LaundryOrder::STATUS_CART,
             ]);
 
             foreach ($request->order_items as $itemData) {
@@ -188,7 +188,7 @@ class LaundryOrderController extends Controller
             'weight_input'  => $request->weight_input,
             'total_price'   => $total,
             'payment_status' => 'pending',
-            'order_status'  => 'cart',
+            'order_status'  => LaundryOrder::STATUS_CART,
         ]);
 
         return response()->json([
@@ -201,7 +201,7 @@ class LaundryOrderController extends Controller
     {
         $orders = LaundryOrder::with(['package', 'items.item', 'addons'])
             ->where('user_id', $request->user()->id)
-            ->where('order_status', 'cart')
+            ->where('order_status', LaundryOrder::STATUS_CART)
             ->latest()
             ->get();
 
@@ -221,7 +221,7 @@ class LaundryOrderController extends Controller
 
         $order = LaundryOrder::where('id', $id)
             ->where('user_id', $user->id)
-            ->where('order_status', 'cart')
+            ->where('order_status', LaundryOrder::STATUS_CART)
             ->first();
 
         if (!$order) {
@@ -269,7 +269,7 @@ class LaundryOrderController extends Controller
                     'payment_status' => 'pending',
                     'user_id'    => $user->id,
                     'address_id' => $defaultAddress->id,
-                    'order_status' => 'created',
+                    'order_status' => LaundryOrder::STATUS_CREATED,
                     'total_price' => 0,
                 ]);
                 $total = 0;
@@ -327,7 +327,7 @@ class LaundryOrderController extends Controller
 
         // ================= LAUNDRY =================
         $orders = LaundryOrder::where('user_id', $user->id)
-            ->where('order_status', 'cart')
+            ->where('order_status', LaundryOrder::STATUS_CART)
             ->get();
 
         if ($orders->isEmpty()) {
@@ -342,7 +342,7 @@ class LaundryOrderController extends Controller
 
             foreach ($orders as $laundry_order) {
 
-                $laundry_order->order_status = 'created';
+                $laundry_order->order_status = LaundryOrder::STATUS_CREATED;
                 $laundry_order->address_id = $defaultAddress->id;
                 $laundry_order->save();
             }

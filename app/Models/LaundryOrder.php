@@ -9,6 +9,7 @@ class LaundryOrder extends Model
 {
     use HasFactory;
 
+    const STATUS_CART = 'cart';
     const STATUS_CREATED = 'created';
     const STATUS_PROCESS = 'process';
     const STATUS_VALID = 'valid';
