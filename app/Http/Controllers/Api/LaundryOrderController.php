@@ -240,50 +240,29 @@ class LaundryOrderController extends Controller
     public function checkout(Request $request)
     {
         $user = $request->user();
-    
-        Log::info('CHECKOUT START', [
-            'user_id' => $user->id,
-            'request' => $request->all()
-        ]);
-    
         // ambil default address
         $defaultAddress = $user->addresses()
             ->where('is_default', true)
             ->first();
-    
-        Log::info('DEFAULT ADDRESS', [
-            'address' => $defaultAddress
-        ]);
-    
+
         if (!$defaultAddress) {
-            Log::warning('DEFAULT ADDRESS NOT FOUND');
-    
             return response()->json([
                 'message' => 'Alamat default belum dipilih'
             ], 400);
         }
-    
+
         // ================= MARKET =================
         if ($request->is_included_market_item) {
-    
-            Log::info('MARKET CHECKOUT TRIGGERED');
-    
             $items = $request->items;
-    
-            Log::info('MARKET ITEMS', [
-                'items' => $items
-            ]);
-    
+
             if (empty($items)) {
-                Log::warning('MARKET ITEMS EMPTY');
-    
                 return response()->json([
                     'message' => 'Item kosong'
                 ], 400);
             }
-    
+
             DB::beginTransaction();
-    
+
             try {
                 $order = Order::create([
                     'order_code' => 'ORD-' . time(),
@@ -291,33 +270,19 @@ class LaundryOrderController extends Controller
                     'user_id'    => $user->id,
                     'address_id' => $defaultAddress->id,
                     'order_status' => 'created',
-                    'total_price'=> 0,
+                    'total_price' => 0,
                 ]);
-    
-                Log::info('MARKET ORDER CREATED', [
-                    'order_id' => $order->id
-                ]);
-    
                 $total = 0;
-    
+
                 foreach ($items as $item) {
-    
-                    Log::info('PROCESS ITEM', [
-                        'item' => $item
-                    ]);
-    
                     $product = Product::find($item['product_id']);
-    
+
                     if (!$product) {
-                        Log::error('PRODUCT NOT FOUND', [
-                            'product_id' => $item['product_id']
-                        ]);
-    
                         throw new \Exception('Product tidak ditemukan');
                     }
-    
+
                     $subtotal = $product->price * $item['qty'];
-    
+
                     OrderItem::create([
                         'order_id'   => $order->id,
                         'product_id' => $product->id,
@@ -325,110 +290,70 @@ class LaundryOrderController extends Controller
                         'qty'        => $item['qty'],
                         'subtotal'   => $subtotal,
                     ]);
-    
+
                     Log::info('ORDER ITEM CREATED', [
                         'product_id' => $product->id,
                         'qty' => $item['qty'],
                         'subtotal' => $subtotal
                     ]);
-    
+
                     $total += $subtotal;
                 }
-    
+
                 $order->update([
                     'total_price' => $total
                 ]);
-    
-                Log::info('MARKET ORDER TOTAL UPDATED', [
-                    'order_id' => $order->id,
-                    'total' => $total
-                ]);
-    
+
                 DB::commit();
-    
-                Log::info('MARKET CHECKOUT SUCCESS');
-    
+
                 return response()->json([
                     'message' => 'Order market berhasil dibuat',
                     'order_id' => $order->id
                 ]);
-    
             } catch (\Exception $e) {
-    
+
                 DB::rollBack();
-    
+
                 Log::error('MARKET CHECKOUT ERROR', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);
-    
+
                 return response()->json([
                     'message' => $e->getMessage()
                 ], 500);
             }
         }
-    
+
         // ================= LAUNDRY =================
-        Log::info('LAUNDRY CHECKOUT TRIGGERED');
-    
         $orders = LaundryOrder::where('user_id', $user->id)
             ->where('order_status', 'cart')
             ->get();
-    
-        Log::info('LAUNDRY CART FOUND', [
-            'count' => $orders->count(),
-            'orders' => $orders->toArray()
-        ]);
-    
+
         if ($orders->isEmpty()) {
-            Log::warning('LAUNDRY CART EMPTY');
-    
             return response()->json([
                 'message' => 'Cart kosong'
             ], 400);
         }
-    
+
         DB::beginTransaction();
-    
+
         try {
-    
-            foreach ($orders as $order) {
-    
-                Log::info('BEFORE UPDATE', [
-                    'order_id' => $order->id,
-                    'data' => $order->toArray()
-                ]);
-    
-                $updated = $order->update([
-                    'address_id'   => $defaultAddress->id,
-                    'order_status' => 'created',
-                ]);
-    
-                Log::info('UPDATE RESULT', [
-                    'order_id' => $order->id,
-                    'success' => $updated,
-                    'after' => $order->fresh()
-                ]);
+
+            foreach ($orders as $laundry_order) {
+
+                $laundry_order->order_status = 'created';
+                $laundry_order->address_id = $defaultAddress->id;
+                $laundry_order->save();
             }
-    
             DB::commit();
-    
-            Log::info('LAUNDRY CHECKOUT SUCCESS');
-    
+
             return response()->json([
                 'success' => true,
                 'message' => 'Order laundry berhasil dibuat',
             ]);
-    
         } catch (\Exception $e) {
-    
             DB::rollBack();
-    
-            Log::error('LAUNDRY CHECKOUT ERROR', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-    
             return response()->json([
                 'message' => $e->getMessage()
             ], 500);
