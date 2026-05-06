@@ -8,6 +8,7 @@ use App\Models\LaundryPackage;
 use App\Models\LaundryItem;
 use App\Models\LaundryOrderItem;
 use App\Models\Order;
+use App\Models\UserAddress;
 use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -241,8 +242,8 @@ class LaundryOrderController extends Controller
     {
         $user = $request->user();
         // ambil default address
-        $defaultAddress = $user->addresses()
-            ->where('is_default', true)
+        $defaultAddress = UserAddress::where('user_id', $user->id)
+            ->where('is_default', 1)
             ->first();
 
         if (!$defaultAddress) {
