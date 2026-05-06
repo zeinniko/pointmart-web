@@ -416,6 +416,7 @@ class LaundryOrderController extends Controller
             Log::info('LAUNDRY CHECKOUT SUCCESS');
     
             return response()->json([
+                'success' => true,
                 'message' => 'Order laundry berhasil dibuat',
             ]);
     
