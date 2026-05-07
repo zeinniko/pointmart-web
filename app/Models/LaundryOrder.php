@@ -10,11 +10,11 @@ class LaundryOrder extends Model
     use HasFactory;
 
     const STATUS_CART = 'cart';
-    const STATUS_CREATED = 'created';
-    const STATUS_PROCESS = 'process';
-    const STATUS_VALID = 'valid';
-    const STATUS_DELIVER = 'deliver';
-    const STATUS_FINISH = 'finish';
+    const STATUS_CREATED = 'created'; // dipesan oleh customer
+    const STATUS_PROCESS = 'process'; // jemput dicek oleh admin pilih deliver
+    const STATUS_VALID = 'valid'; // disetujui oleh admin / deliver (sudah terima uang)
+    const STATUS_DELIVER = 'deliver'; // antar deliver
+    const STATUS_FINISH = 'finish'; // diselesaikan oleh admin & customer
 
     protected $table = 'laundry_orders';
 

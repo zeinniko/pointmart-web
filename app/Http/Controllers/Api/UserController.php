@@ -145,4 +145,15 @@ class UserController extends Controller
             'data' => $user
         ]);
     }
+
+    public function drivers()
+    {
+        $drivers = User::whereHas('role', function ($q) {
+            $q->where('name', 'Deliver');
+        })->get();
+
+        return response()->json([
+            'data' => $drivers
+        ]);
+    }
 }

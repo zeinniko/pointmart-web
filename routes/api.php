@@ -132,5 +132,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cart-laundry', [LaundryOrderController::class, 'getCart']);
     Route::delete('/cart-laundry/{id}', [LaundryOrderController::class, 'removeCart']);
     Route::post('/laundry/checkout', [LaundryOrderController::class, 'checkout']);
-
+    Route::get('/drivers', [UserController::class, 'drivers']);
 });

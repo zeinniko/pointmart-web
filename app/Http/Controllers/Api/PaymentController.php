@@ -17,6 +17,8 @@ class PaymentController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+
         $orders = LaundryOrder::with([
             'user',
             'package',
@@ -27,12 +29,31 @@ class PaymentController extends Controller
             'payment',
             'invoice'
         ])
-            ->where('order_status', '!=', 'cart')
+            ->where('order_status', '!=', LaundryOrder::STATUS_CART)
+
+            // FILTER STATUS
             ->when($request->status, function ($query) use ($request) {
                 $query->where('order_status', $request->status);
             })
+
+            // JIKA ROLE DRIVER / DELIVER
+            ->when($user->role_id == 2, function ($query) use ($user) {
+                $query->where('driver_id', $user->id);
+            })
+
             ->latest()
-            ->paginate(10);
+            ->get()
+
+            // GROUP BY TANGGAL
+            ->groupBy(function ($order) {
+                return \Carbon\Carbon::parse($order->created_at)
+                    ->format('Y-m-d');
+            })
+
+            // GROUP BY USER
+            ->map(function ($dateOrders) {
+                return $dateOrders->groupBy('user_id');
+            });
 
         return response()->json([
             'success' => true,
@@ -84,35 +105,156 @@ class PaymentController extends Controller
             'invoice'
         ])->findOrFail($id);
 
-        // ambil order marketplace berdasarkan user
+        // ambil tanggal order laundry
+        $orderDate = \Carbon\Carbon::parse($order->created_at)->format('Y-m-d');
+
+        // ambil marketplace order dengan tanggal yang sama
         $marketplaceOrders = Order::with([
             'items.product',
             'address'
         ])
             ->where('user_id', $order->user_id)
+            ->whereDate('created_at', $orderDate) // 🔥 filter tanggal
+            ->where('order_status', LaundryOrder::STATUS_CREATED)
             ->latest()
             ->get();
 
         return response()->json([
             'data' => $order,
-            'marketplace_orders' => $marketplaceOrders
+            'marketplace_orders' => $marketplaceOrders->isEmpty()
+                ? null
+                : $marketplaceOrders
         ]);
     }
 
     /**
-     * Update payment (rarely used)
+     * Update status order laundry
      */
     public function update(Request $request, string $id)
     {
-        $payment = LaundryOrder::findOrFail($id);
+        $order = LaundryOrder::findOrFail($id);
 
-        $payment->update(
-            $request->only(['order_status'])
-        );
+        $request->validate([
+            'order_status' => 'required|string',
+            'driver_id'    => 'nullable|exists:users,id',
+        ]);
+
+        $newStatus = $request->order_status;
+
+        /**
+         * Validasi flow status
+         *
+         * cart -> created
+         * created -> process
+         * process -> valid
+         * valid -> deliver
+         * deliver -> finish
+         */
+
+        $allowedTransitions = [
+            LaundryOrder::STATUS_CREATED => [
+                LaundryOrder::STATUS_PROCESS,
+            ],
+
+            LaundryOrder::STATUS_PROCESS => [
+                LaundryOrder::STATUS_VALID,
+            ],
+
+            LaundryOrder::STATUS_VALID => [
+                LaundryOrder::STATUS_DELIVER,
+            ],
+
+            LaundryOrder::STATUS_DELIVER => [
+                LaundryOrder::STATUS_FINISH,
+            ],
+        ];
+
+        $currentStatus = $order->order_status;
+
+        if (
+            isset($allowedTransitions[$currentStatus]) &&
+            !in_array($newStatus, $allowedTransitions[$currentStatus])
+        ) {
+            return response()->json([
+                'message' => 'Invalid status transition',
+            ], 422);
+        }
+
+        /**
+         * Saat PROCESS wajib pilih driver
+         */
+        if (
+            $newStatus === LaundryOrder::STATUS_PROCESS &&
+            !$request->driver_id
+        ) {
+            return response()->json([
+                'message' => 'Driver wajib dipilih saat process order',
+            ], 422);
+        }
+
+        /**
+         * Assign driver
+         */
+        if ($request->driver_id) {
+            $order->driver_id = $request->driver_id;
+        }
+
+        /**
+         * Auto payment paid saat valid
+         */
+        /**
+         * Auto payment paid saat valid
+         */
+        if ($newStatus === LaundryOrder::STATUS_VALID) {
+
+            $order->payment_status = 'paid';
+
+            Payment::updateOrCreate(
+                [
+                    'order_id'   => $order->id,
+                    'order_type' => 'laundry',
+                ],
+                [
+                    'amount'           => $order->total_price,
+                    'method'           => 'cash',
+                    'status'           => 'paid',
+                    'transaction_time' => now(),
+                ]
+            );
+        }
+
+        /**
+         * Update status
+         */
+        $order->order_status = $newStatus;
+
+        /**
+         * Optional pickup & delivery time
+         */
+        if (
+            $newStatus === LaundryOrder::STATUS_PROCESS &&
+            !$order->pickup_time
+        ) {
+            $order->pickup_time = now();
+        }
+
+        if (
+            $newStatus === LaundryOrder::STATUS_FINISH &&
+            !$order->delivery_time
+        ) {
+            $order->delivery_time = now();
+        }
+
+        $order->save();
 
         return response()->json([
-            'message' => 'Payment updated',
-            'data'    => $payment
+            'message' => 'Order updated successfully',
+            'data'    => $order->load([
+                'user',
+                'driver',
+                'payment',
+                'invoice',
+            ]),
         ]);
     }
 
