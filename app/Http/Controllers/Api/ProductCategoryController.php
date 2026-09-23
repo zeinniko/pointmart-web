@@ -26,17 +26,16 @@ class ProductCategoryController extends Controller
     {
         $query = ProductCategory::query();
     
-        if ($request->filled('q')) {
-            $keyword = $request->q;
-            $query->where('name', 'like', "%$keyword%");
+        $keyword = $request->get('q') ?? $request->get('search');
+        if (!empty($keyword)) {
+            $query->where('name', 'like', "%{$keyword}%");
         }
     
-        if ($request->filled('is_active')) {
+        if ($request->has('is_active') && $request->is_active !== 'all' && $request->is_active !== '') {
             $query->where('is_active', (bool) $request->is_active);
         }
     
-        $query->has('products');
-    
+        
         if ($request->boolean('include_products')) {
             $query->with('products');
         }

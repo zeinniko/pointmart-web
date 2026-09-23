@@ -21,19 +21,9 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        Log::info('Login attempt', [
-            'email' => $request->email,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-        ]);
-
         $user = User::with('role')->where('email', $request->email)->first();
 
-        if (!$user || ! Hash::check($request->password, $user->password)) {
-            Log::warning('Login failed: email not found', [
-                'email' => $request->email,
-                'ip' => $request->ip(),
-            ]);
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email atau password salah',
@@ -41,14 +31,16 @@ class AuthController extends Controller
             ], 422);
         }
 
+        // Opsional: Validasi hanya Admin / Manager yang bisa login ke Web Admin
+        if (!in_array($user->role?->name, ['Admin', 'Manager'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses ke Web Admin PointMart.',
+                'data' => null
+            ], 403);
+        }
+
         $token = $user->createToken('API Token')->plainTextToken;
-
-
-        Log::info('Login success', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'ip' => $request->ip(),
-        ]);
 
         return response()->json([
             'success' => true,

@@ -4,11 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\PosOrder;
-use App\Models\LaundryOrder;
-use App\Models\OrderItem;
-use App\Models\PosOrderItem;
-use App\Models\LaundryOrderItem;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,29 +14,11 @@ class DailyReportController extends Controller
     {
         [$from, $to] = $this->resolveDateRange($request);
 
-        $orderCount =
-            Order::whereBetween('created_at', [$from, $to])->count()
-            + PosOrder::whereBetween('created_at', [$from, $to])->count()
-            + LaundryOrder::whereBetween('created_at', [$from, $to])->count();
-
-        $revenue =
-            Order::whereBetween('created_at', [$from, $to])->sum('total_price')
-            + PosOrder::whereBetween('created_at', [$from, $to])->sum('total_price')
-            + LaundryOrder::whereBetween('created_at', [$from, $to])->sum('total_price');
+        $orderCount = Order::whereBetween('created_at', [$from, $to])->count();
+        $revenue = Order::whereBetween('created_at', [$from, $to])->sum('total_price');
 
         // === PRODUCTS SOLD ===
-        $productsSold =
-            Order::whereBetween('created_at', [$from, $to])
-            ->withSum('items', 'qty')
-            ->get()
-            ->sum('items_sum_qty')
-
-            + PosOrder::whereBetween('created_at', [$from, $to])
-            ->withSum('items', 'qty')
-            ->get()
-            ->sum('items_sum_qty')
-
-            + LaundryOrder::whereBetween('created_at', [$from, $to])
+        $productsSold = Order::whereBetween('created_at', [$from, $to])
             ->withSum('items', 'qty')
             ->get()
             ->sum('items_sum_qty');
@@ -76,13 +53,25 @@ class DailyReportController extends Controller
     {
         [$from, $to] = $this->resolveDateRange($request);
 
-        $data = PosOrder::selectRaw('DATE(created_at) as date, SUM(total_price) as revenue')
+        $data = Order::selectRaw('DATE(created_at) as date, SUM(total_price) as revenue')
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * SHOW (Pencegah Error jika dipanggil sebagai resource detail)
+     */
+    public function show(Request $request, string $id)
+    {
+        if ($id === 'chart') {
+            return $this->chart($request);
+        }
+
+        return $this->index($request);
     }
 
     private function resolveDateRange(Request $request): array

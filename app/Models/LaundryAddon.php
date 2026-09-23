@@ -18,9 +18,4 @@ class LaundryAddon extends Model
     protected $casts = [
         'is_active' => 'boolean'
     ];
-
-    public function orderAddons()
-    {
-        return $this->hasMany(LaundryOrderAddon::class, 'addon_id');
-    }
 }

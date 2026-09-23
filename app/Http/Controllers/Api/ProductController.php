@@ -28,19 +28,20 @@ class ProductController extends Controller
     {
         $query = Product::query();
 
-        if ($request->filled('q')) {
-            $keyword = $request->q;
+        $keyword = $request->get('q') ?? $request->get('search');
+        if (!empty($keyword)) {
             $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%$keyword%")
-                  ->orWhere('barcode', 'like', "%$keyword%");
+                $q->where('name', 'like', "%{$keyword}%")
+                  ->orWhere('barcode', 'like', "%{$keyword}%");
             });
         }
 
-        if ($request->filled('category_id')) {
-            $query->where('product_category_id', $request->category_id);
+        $categoryId = $request->get('category_id') ?? $request->get('category');
+        if (!empty($categoryId) && $categoryId !== 'all') {
+            $query->where('product_category_id', $categoryId);
         }
 
-        if ($request->filled('is_active')) {
+        if ($request->has('is_active') && $request->is_active !== 'all' && $request->is_active !== '') {
             $query->where('is_active', (bool) $request->is_active);
         }
 

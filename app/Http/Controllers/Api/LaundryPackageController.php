@@ -26,15 +26,19 @@ class LaundryPackageController extends Controller
     {
         $query = LaundryPackage::query();
 
-        if ($request->filled('q')) {
-            $q = $request->q;
-            $query->where(function($qbuilder) use ($q) {
-                $qbuilder->where('name', 'like', '%'.$q.'%')
-                         ->orWhere('category', 'like', '%'.$q.'%');
+        $keyword = $request->get('q') ?? $request->get('search');
+        if (!empty($keyword)) {
+            $query->where(function ($qbuilder) use ($keyword) {
+                $qbuilder->where('name', 'like', "%{$keyword}%")
+                         ->orWhere('category', 'like', "%{$keyword}%");
             });
         }
-
-        if ($request->filled('is_active')) {
+    
+        if ($request->filled('type') && $request->type !== 'all') {
+            $query->where('type', $request->type);
+        }
+    
+        if ($request->has('is_active') && $request->is_active !== 'all' && $request->is_active !== '') {
             $query->where('is_active', (bool) $request->is_active);
         }
 

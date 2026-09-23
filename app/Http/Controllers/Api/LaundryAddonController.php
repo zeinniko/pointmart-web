@@ -26,19 +26,19 @@ class LaundryAddonController extends Controller
     {
         $query = LaundryAddon::query();
 
-        if ($request->filled('q')) {
-            $keyword = $request->q;
+        $keyword = $request->get('q') ?? $request->get('search');
+        if (!empty($keyword)) {
             $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', '%'.$keyword.'%')
-                  ->orWhere('code', 'like', '%'.$keyword.'%');
+                $q->where('name', 'like', "%{$keyword}%")
+                  ->orWhere('code', 'like', "%{$keyword}%");
             });
         }
 
-        if ($request->filled('type')) {
+        if ($request->filled('type') && $request->type !== 'all') {
             $query->where('type', $request->type);
         }
-
-        if ($request->filled('is_active')) {
+    
+        if ($request->has('is_active') && $request->is_active !== 'all' && $request->is_active !== '') {
             $query->where('is_active', (bool) $request->is_active);
         }
 

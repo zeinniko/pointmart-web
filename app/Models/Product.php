@@ -39,8 +39,4 @@ class Product extends Model
         return $this->hasMany(OrderItem::class, 'product_id');
     }
 
-    public function posOrderItems()
-    {
-        return $this->hasMany(PosOrderItem::class, 'product_id');
-    }
 }

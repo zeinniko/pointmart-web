@@ -4,172 +4,141 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
-use App\Models\LaundryOrder;
-use App\Models\PosOrder;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
     /**
-     * List payments
+     * List payments / orders terpusat
      */
-
     public function index(Request $request)
     {
-        $user = $request->user();
+        $user =$request->user();
 
-        $orders = LaundryOrder::with([
+        $orders = Order::with([
             'user',
             'package',
             'address',
             'driver',
-            'items',
-            'addons',
+            'items.product',
+            'items.laundryItem',
+            'items.addon',
             'payment',
-            'invoice'
         ])
-            ->where('order_status', '!=', LaundryOrder::STATUS_CART)
-
-            // FILTER STATUS
+            ->where('order_status', '!=', 'cart')
+            // Filter Berdasarkan Jenis Order (opsional: laundry, minimarket, marketplace)
+            ->when($request->order_type, function ($query) use ($request) {
+                $query->where('order_type',$request->order_type);
+            })
+            // Filter Status Order
             ->when($request->status, function ($query) use ($request) {
-                $query->where('order_status', $request->status);
+                $query->where('order_status',$request->status);
             })
-
-            // JIKA ROLE DRIVER / DELIVER
-            ->when($user->role_id == 2, function ($query) use ($user) {
-                $query->where('driver_id', $user->id);
+            // Jika Role Driver / Deliver (role_id = 2)
+            ->when($user &&$user->role_id == 2, function ($query) use ($user) {
+                $query->where('driver_id',$user->id);
             })
-
             ->latest()
             ->get()
-
-            // GROUP BY TANGGAL
+            // Group by Tanggal & User
             ->groupBy(function ($order) {
-                return \Carbon\Carbon::parse($order->created_at)
-                    ->format('Y-m-d');
+                return \Carbon\Carbon::parse($order->created_at)->format('Y-m-d');
             })
-
-            // GROUP BY USER
             ->map(function ($dateOrders) {
                 return $dateOrders->groupBy('user_id');
             });
 
         return response()->json([
             'success' => true,
-            'message' => 'List Order',
-            'data' => $orders
+            'message' => 'List Order & Pembayaran',
+            'data'    => $orders
         ]);
     }
 
     /**
-     * Store payment (POS)
+     * Store payment (POS Minimarket, Laundry, & Marketplace)
      */
     public function store(Request $request)
     {
         $request->validate([
-            'order_id'   => 'required|exists:pos_orders,id',
-            'payment_method'     => 'required|string',
-            'order_type'     => 'required|string',
+            'order_id'       => 'required|integer|exists:orders,id',
+            'order_type'     => 'required|in:laundry,minimarket,marketplace',
+            'payment_method' => 'required|string',
         ]);
 
-        $order = PosOrder::findOrFail($request->order_id);
+        return DB::transaction(function () use ($request) {
+            $order = Order::findOrFail($request->order_id);
+            $amount =$order->total_price;
 
-        $payment = Payment::create([
-            'order_id'         => $order->id,
-            'order_type'       => $request->order_type,
-            'amount'           => $order->total_price,
-            'method'           => $request->payment_method,
-            'status'           => 'paid',
-            'transaction_time' => now(),
-        ]);
+            // 1. Update status order utama
+            if ($request->order_type === 'minimarket') {$order->update([
+                    'payment_status' => 'paid',
+                    'order_status'   => 'completed',
+                ]);
+            } else {
+                $order->update([
+                    'payment_status' => 'paid',
+                ]);
+            }
 
-        return response()->json([
-            'message' => 'Payment berhasil',
-            'data'    => $payment
-        ], 201);
+            // 2. Simpan record pembayaran ke tabel `payments`
+            $payment = Payment::updateOrCreate(
+                [
+                    'order_id'   => $order->id,
+                    'order_type' => $request->order_type,
+                ],
+                [
+                    'amount'           => $amount,
+                    'method'           => $request->payment_method,
+                    'status'           => 'paid',
+                    'transaction_time' => now(),
+                ]
+            );
+
+            return response()->json([
+                'message' => 'Payment berhasil diproses',
+                'data'    => $payment
+            ], 201);
+        });
     }
 
     /**
-     * Show payment detail
+     * Show payment / order detail
      */
     public function show($id)
     {
-        $order = LaundryOrder::with([
-            'user',
-            'package',
-            'address',
-            'items.item',
-            'addons.addon',
-            'payment',
-            'invoice'
-        ])->findOrFail($id);
-
-        // ambil tanggal order laundry
-        $orderDate = \Carbon\Carbon::parse($order->created_at)->format('Y-m-d');
-
-        // ambil marketplace order dengan tanggal yang sama
-        $marketplaceOrders = Order::with([
-            'items.product',
-            'address'
-        ])
-            ->where('user_id', $order->user_id)
-            ->whereDate('created_at', $orderDate) // 🔥 filter tanggal
-            ->where('order_status', LaundryOrder::STATUS_CREATED)
-            ->latest()
-            ->get();
+        $order = Order::with([             'user',             'package',             'address',             'driver',             'items.product',             'items.laundryItem',             'items.addon',             'payment',         ])->findOrFail($id);
 
         return response()->json([
-            'data' => $order,
-            'marketplace_orders' => $marketplaceOrders->isEmpty()
-                ? null
-                : $marketplaceOrders
+            'success' => true,
+            'data'    => $order,
         ]);
     }
 
     /**
-     * Update status order laundry
+     * Update status order & assign driver (khusus alur laundry / pengantaran)
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string$id)
     {
-        $order = LaundryOrder::findOrFail($id);
+        $order = Order::findOrFail($id);
 
         $request->validate([
             'order_status' => 'required|string',
             'driver_id'    => 'nullable|exists:users,id',
         ]);
 
-        $newStatus = $request->order_status;
-
-        /**
-         * Validasi flow status
-         *
-         * cart -> created
-         * created -> process
-         * process -> valid
-         * valid -> deliver
-         * deliver -> finish
-         */
+        $newStatus =$request->order_status;
 
         $allowedTransitions = [
-            LaundryOrder::STATUS_CREATED => [
-                LaundryOrder::STATUS_PROCESS,
-            ],
-
-            LaundryOrder::STATUS_PROCESS => [
-                LaundryOrder::STATUS_VALID,
-            ],
-
-            LaundryOrder::STATUS_VALID => [
-                LaundryOrder::STATUS_DELIVER,
-            ],
-
-            LaundryOrder::STATUS_DELIVER => [
-                LaundryOrder::STATUS_FINISH,
-            ],
+            'created' => ['process'],
+            'process' => ['valid'],
+            'valid'   => ['deliver'],
+            'deliver' => ['finish'],
         ];
 
-        $currentStatus = $order->order_status;
+        $currentStatus =$order->order_status;
 
         if (
             isset($allowedTransitions[$currentStatus]) &&
@@ -180,39 +149,24 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        /**
-         * Saat PROCESS wajib pilih driver
-         */
-        if (
-            $newStatus === LaundryOrder::STATUS_PROCESS &&
-            !$request->driver_id
-        ) {
+        // Saat status PROCESS, driver wajib dipilih
+        if ($newStatus === 'process' && !$request->driver_id) {
             return response()->json([
                 'message' => 'Driver wajib dipilih saat process order',
             ], 422);
         }
 
-        /**
-         * Assign driver
-         */
         if ($request->driver_id) {
-            $order->driver_id = $request->driver_id;
+            $order->driver_id =$request->driver_id;
         }
 
-        /**
-         * Auto payment paid saat valid
-         */
-        /**
-         * Auto payment paid saat valid
-         */
-        if ($newStatus === LaundryOrder::STATUS_VALID) {
-
-            $order->payment_status = 'paid';
+        // Otomatis tandai Lunas saat disetujui (STATUS VALID)
+        if ($newStatus === 'valid') {$order->payment_status = 'paid';
 
             Payment::updateOrCreate(
                 [
                     'order_id'   => $order->id,
-                    'order_type' => 'laundry',
+                    'order_type' => $order->order_type ?? 'laundry',
                 ],
                 [
                     'amount'           => $order->total_price,
@@ -223,38 +177,19 @@ class PaymentController extends Controller
             );
         }
 
-        /**
-         * Update status
-         */
-        $order->order_status = $newStatus;
+        $order->order_status =$newStatus;
 
-        /**
-         * Optional pickup & delivery time
-         */
-        if (
-            $newStatus === LaundryOrder::STATUS_PROCESS &&
-            !$order->pickup_time
-        ) {
-            $order->pickup_time = now();
+        if ($newStatus === 'process' && !$order->pickup_time) {$order->pickup_time = now();
         }
 
-        if (
-            $newStatus === LaundryOrder::STATUS_FINISH &&
-            !$order->delivery_time
-        ) {
-            $order->delivery_time = now();
+        if ($newStatus === 'finish' && !$order->delivery_time) {$order->delivery_time = now();
         }
 
         $order->save();
 
         return response()->json([
             'message' => 'Order updated successfully',
-            'data'    => $order->load([
-                'user',
-                'driver',
-                'payment',
-                'invoice',
-            ]),
+            'data'    => $order->load(['user', 'driver', 'payment']),
         ]);
     }
 
@@ -263,7 +198,7 @@ class PaymentController extends Controller
      */
     public function destroy(string $id)
     {
-        Payment::findOrFail($id)->delete();
+        Payment::where('order_id', $id)->delete();
 
         return response()->json([
             'message' => 'Payment deleted'

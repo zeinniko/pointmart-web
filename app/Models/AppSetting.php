@@ -15,6 +15,6 @@ class AppSetting extends Model
     ];
 
     protected $casts = [
-        'value' => 'json', // otomatis decode JSON (khusus FAQs)
+        'value' => 'json',
     ];
 }

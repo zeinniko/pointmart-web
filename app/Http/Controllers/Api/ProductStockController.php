@@ -50,8 +50,39 @@ class ProductStockController extends Controller
     {
         $query = ProductStock::query();
 
-        if ($request->filled('product_id')) {
-            $query->where('product_id', $request->product_id);
+        $keyword = $request->get('q') ?? $request->get('search');
+        if (!empty($keyword)) {
+            $query->whereHas('product', function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%")
+                  ->orWhere('barcode', 'like', "%{$keyword}%");
+            });
+        }
+
+        $productId = $request->get('product_id') ?? $request->get('product');
+        if (!empty($productId) && $productId !== 'all') {
+            $query->where('product_id', $productId);
+        }
+
+        $categoryId = $request->get('category_id') ?? $request->get('category');
+        if (!empty($categoryId) && $categoryId !== 'all') {
+            $query->whereHas('product', function ($q) use ($categoryId) {
+                $q->where('product_category_id', $categoryId);
+            });
+        }
+
+        $status = $request->get('status') ?? $request->get('stock_status');
+        if (!empty($status) && $status !== 'all') {
+            if ($status === 'low') {
+                $query->whereNotNull('min_stock')
+                      ->where('min_stock', '>', 0)
+                      ->whereColumn('stock', '<=', 'min_stock');
+            } elseif ($status === 'normal') {
+                $query->where(function ($q) {
+                    $q->whereNull('min_stock')
+                      ->orWhere('min_stock', 0)
+                      ->orWhereColumn('stock', '>', 'min_stock');
+                });
+            }
         }
 
         $query->with('product');

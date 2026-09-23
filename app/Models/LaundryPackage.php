@@ -33,9 +33,4 @@ class LaundryPackage extends Model
     {
         return $this->hasMany(LaundryItem::class, 'package_id');
     }
-
-    public function orders()
-    {
-        return $this->hasMany(LaundryOrder::class, 'package_id');
-    }
 }
